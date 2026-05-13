@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -15,6 +16,12 @@ import (
 	websocketapi "github.com/pojntfx/weron/internal/api/websocket"
 	"github.com/pojntfx/weron/internal/encryption"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
+)
+
+const (
+	excludeInterfacePrefixFlag = "exclude-interface-prefix"
+	excludeInterfaceIpFlag     = "exclude-interface-ip"
 )
 
 var (
@@ -62,6 +69,8 @@ type Adapter struct {
 	peers chan *Peer
 
 	api *webrtc.API
+
+	excludedIPs []*net.IPNet // Collected IP addresses from excluded interface
 }
 
 // NewAdapter creates the adapter
@@ -94,6 +103,8 @@ func NewAdapter(
 		cancel: cancel,
 		peers:  make(chan *Peer),
 		lines:  make(chan []byte),
+
+		excludedIPs: make([]*net.IPNet, 0),
 	}
 }
 
@@ -108,9 +119,103 @@ func (a *Adapter) sendLine(line []byte) {
 	a.lines <- line
 }
 
+func (a *Adapter) CollectExcludedInterfaceIPs(interfaceName string) {
+	ifaces, _ := net.Interfaces()
+	for _, iface := range ifaces {
+		if iface.Name == interfaceName {
+			addrs, _ := iface.Addrs()
+			for _, addr := range addrs {
+				if ipnet, ok := addr.(*net.IPNet); ok {
+					a.excludedIPs = append(a.excludedIPs, ipnet)
+				}
+			}
+		}
+	}
+}
+
+func (a *Adapter) IsCandidateExcluded(candidateContent string) bool {
+	fields := strings.Fields(candidateContent)
+	if len(fields) < 5 {
+		return false
+	}
+
+	ipStr := fields[4]
+	candidateIP := net.ParseIP(ipStr)
+	if candidateIP == nil {
+		return false
+	}
+
+	for _, ipnet := range a.excludedIPs {
+		if ipnet.Contains(candidateIP) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Open connects the adapter to the signaler
 func (a *Adapter) Open() (chan string, error) {
+	interfaceIps := viper.GetString(excludeInterfaceIpFlag)
+	if interfaceIps != "" {
+		ipStrings := strings.Split(interfaceIps, ",")
+		for _, s := range ipStrings {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
+			}
+
+			_, ipNet, err := net.ParseCIDR(s)
+			if err == nil {
+				a.excludedIPs = append(a.excludedIPs, ipNet)
+				continue
+			}
+
+			ip := net.ParseIP(s)
+			if ip != nil {
+				mask := net.CIDRMask(8*len(ip.To4()), 8*len(ip.To4()))
+				if ip.To4() == nil {
+					mask = net.CIDRMask(128, 128)
+				}
+				singleNet := &net.IPNet{IP: ip, Mask: mask}
+				a.excludedIPs = append(a.excludedIPs, singleNet)
+			}
+		}
+	}
+
 	settingEngine := webrtc.SettingEngine{}
+	interfacePrefixes := viper.GetString(excludeInterfacePrefixFlag)
+	if interfacePrefixes != "" {
+		prefixes := strings.Split(interfacePrefixes, ",")
+		ifaces, _ := net.Interfaces()
+		for _, iface := range ifaces {
+			for _, prefix := range prefixes {
+				if strings.HasPrefix(iface.Name, strings.TrimSpace(prefix)) {
+					a.CollectExcludedInterfaceIPs(iface.Name)
+				}
+			}
+		}
+	}
+	if interfacePrefixes != "" {
+		prefixes := strings.Split(interfacePrefixes, ",")
+
+		settingEngine.SetInterfaceFilter(func(interfaceName string) bool {
+			for _, prefix := range prefixes {
+				prefix = strings.TrimSpace(prefix)
+				if prefix == "" {
+					continue
+				}
+
+				matched := strings.HasPrefix(interfaceName, prefix)
+				if matched {
+					return false
+				}
+			}
+
+			return true
+		})
+	}
+
 	settingEngine.DetachDataChannels()
 	a.api = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
 
@@ -722,6 +827,19 @@ func (a *Adapter) Open() (chan string, error) {
 
 							go func() {
 								for candidate := range candidates {
+									candidateContent := candidate.Candidate
+									isDiscarded := a.IsCandidateExcluded(candidateContent)
+									if isDiscarded {
+										log.Debug().
+											Str("address", conn.RemoteAddr().String()).
+											Str("community", community).
+											Str("id", id).
+											Str("peerID", offer.From).
+											Msg("ICE candidate from signaler has been discarded due to exclusion rules")
+
+										continue
+									}
+
 									if err := c.AddICECandidate(candidate); err != nil {
 										errs <- err
 
@@ -849,6 +967,19 @@ func (a *Adapter) Open() (chan string, error) {
 
 							go func() {
 								for candidate := range c.candidates {
+									candidateContent := candidate.Candidate
+									isDiscarded := a.IsCandidateExcluded(candidateContent)
+									if isDiscarded {
+										log.Debug().
+											Str("address", conn.RemoteAddr().String()).
+											Str("community", community).
+											Str("id", id).
+											Str("peerID", answer.From).
+											Msg("ICE candidate from signaler has been discarded due to exclusion rules")
+
+										continue
+									}
+
 									if err := c.conn.AddICECandidate(candidate); err != nil {
 										errs <- err
 

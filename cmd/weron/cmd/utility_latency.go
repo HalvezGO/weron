@@ -148,6 +148,8 @@ func init() {
 	utilityLatencyCommand.PersistentFlags().Bool(serverFlag, false, "Act as a server")
 	utilityLatencyCommand.PersistentFlags().Int(packetLengthFlag, 128, "Size of packet to send and acknowledge")
 	utilityLatencyCommand.PersistentFlags().Duration(pauseFlag, time.Second*1, "Time to wait before sending next packet")
+	utilityLatencyCommand.PersistentFlags().String(excludeInterfacePrefixFlag, "", "Comma-separated, Case-sensitive list of prefixes to exclude from interface names (i.e. \"vEthernet\" matches \"vEthernet_direct\" but not \"vethernet\")")
+	utilityLatencyCommand.PersistentFlags().String(excludeInterfaceIpFlag, "", "Comma-separated list of IPs or IP CIDR to exclude from connecting with (i.e. \"100.64.0.0/24,100.65.0.1\")")
 
 	viper.AutomaticEnv()
 

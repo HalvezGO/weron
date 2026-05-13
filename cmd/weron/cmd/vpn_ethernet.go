@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	devFlag      = "dev"
-	macFlag      = "mac"
-	parallelFlag = "parallel"
+	devFlag                    = "dev"
+	macFlag                    = "mac"
+	parallelFlag               = "parallel"
+	excludeInterfacePrefixFlag = "exclude-interface-prefix"
+	excludeInterfaceIpFlag     = "exclude-interface-ip"
 )
 
 var vpnEthernetCmd = &cobra.Command{
@@ -110,6 +112,8 @@ func init() {
 	vpnEthernetCmd.PersistentFlags().String(devFlag, "", "Name to give to the TAP device (i.e. weron0) (default is auto-generated; only supported on Linux and macOS)")
 	vpnEthernetCmd.PersistentFlags().String(macFlag, "", "MAC address to give to the TAP device (i.e. 3a:f8:de:7b:ef:52) (default is auto-generated; only supported on Linux)")
 	vpnEthernetCmd.PersistentFlags().Int(parallelFlag, runtime.NumCPU(), "Amount of threads to use to decode frames")
+	vpnEthernetCmd.PersistentFlags().String(excludeInterfacePrefixFlag, "", "Comma-separated, Case-sensitive list of prefixes to exclude from interface names (i.e. \"vEthernet\" matches \"vEthernet_direct\" but not \"vethernet\")")
+	vpnEthernetCmd.PersistentFlags().String(excludeInterfaceIpFlag, "", "Comma-separated list of IPs or IP CIDR to exclude from connecting with (i.e. \"100.64.0.0/24,100.65.0.1\")")
 
 	viper.AutomaticEnv()
 

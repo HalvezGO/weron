@@ -175,6 +175,8 @@ func init() {
 	chatCmd.PersistentFlags().StringSlice(iceFlag, []string{"stun:stun.l.google.com:19302"}, "Comma-separated list of STUN servers (in format stun:host:port) and TURN servers to use (in format username:credential@turn:host:port) (i.e. username:credential@turn:global.turn.twilio.com:3478?transport=tcp)")
 	chatCmd.PersistentFlags().Bool(forceRelayFlag, false, "Force usage of TURN servers")
 	chatCmd.PersistentFlags().Duration(kicksFlag, time.Second*5, "Time to wait for kicks")
+	chatCmd.PersistentFlags().String(excludeInterfacePrefixFlag, "", "Comma-separated, Case-sensitive list of prefixes to exclude from interface names (i.e. \"vEthernet\" matches \"vEthernet_direct\" but not \"vethernet\")")
+	chatCmd.PersistentFlags().String(excludeInterfaceIpFlag, "", "Comma-separated list of IPs or IP CIDR to exclude from connecting with (i.e. \"100.64.0.0/24,100.65.0.1\")")
 
 	viper.AutomaticEnv()
 

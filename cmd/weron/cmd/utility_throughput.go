@@ -164,6 +164,8 @@ func init() {
 	utilityThroughputCmd.PersistentFlags().Bool(serverFlag, false, "Act as a server")
 	utilityThroughputCmd.PersistentFlags().Int(packetLengthFlag, 50000, "Size of packet to send")
 	utilityThroughputCmd.PersistentFlags().Int(packetCountFlag, 1000, "Amount of packets to send before waiting for acknowledgement")
+	utilityThroughputCmd.PersistentFlags().String(excludeInterfacePrefixFlag, "", "Comma-separated, Case-sensitive list of prefixes to exclude from interface names (i.e. \"vEthernet\" matches \"vEthernet_direct\" but not \"vethernet\")")
+	utilityThroughputCmd.PersistentFlags().String(excludeInterfaceIpFlag, "", "Comma-separated list of IPs or IP CIDR to exclude from connecting with (i.e. \"100.64.0.0/24,100.65.0.1\")")
 
 	viper.AutomaticEnv()
 

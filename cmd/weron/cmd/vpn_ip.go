@@ -137,6 +137,8 @@ func init() {
 	vpnIPCmd.PersistentFlags().String(idChannelFlag, services.IPID, "Channel to use to negotiate names")
 	vpnIPCmd.PersistentFlags().Duration(kicksFlag, time.Second*5, "Time to wait for kicks")
 	vpnIPCmd.PersistentFlags().Int(maxRetriesFlag, 200, "Maximum amount of times to try and claim an IP address")
+	vpnIPCmd.PersistentFlags().String(excludeInterfacePrefixFlag, "", "Comma-separated, Case-sensitive list of prefixes to exclude from interface names (i.e. \"vEthernet\" matches \"vEthernet_direct\" but not \"vethernet\")")
+	vpnIPCmd.PersistentFlags().String(excludeInterfaceIpFlag, "", "Comma-separated list of IPs or IP CIDR to exclude from connecting with (i.e. \"100.64.0.0/24,100.65.0.1\")")
 
 	viper.AutomaticEnv()
 
